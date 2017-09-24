@@ -101,7 +101,7 @@ func main() {
 
 	err := verifyApiKeys(*live)
 	if err != nil {
-		exitWithError(errors.New("Could not get Gemini API keys from environment"))
+		exitWithError(err)
 	}
 
 	g = gemini.New(*live, gemini_api_key, gemini_api_secret)
