@@ -71,7 +71,7 @@ Commands:
 Flags:
 `
 var red = color.New(color.FgRed).SprintFunc()
-var cyan = color.New(color.FgCyan).SprintFunc()
+var blue = color.New(color.FgHiBlue).SprintFunc()
 var boldWhite = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
 
 var flagset = flag.NewFlagSet("", flag.ExitOnError)
@@ -213,7 +213,7 @@ func balances(useJson bool) {
 	}
 
 	for _, fund := range balances {
-		fmt.Printf("%s: %v\n", cyan(fund.Currency), fund.Amount)
+		fmt.Printf("%s: %v\n", blue(fund.Currency), fund.Amount)
 	}
 }
 
@@ -246,7 +246,7 @@ func book(mkt string, lim int, useJson bool) {
 		if i == 0 {
 			fmt.Printf("%s\t%s\n", boldWhite(askPrice), askAmount)
 		} else {
-			fmt.Printf("%s\t%s\n", cyan(askPrice), askAmount)
+			fmt.Printf("%s\t%s\n", blue(askPrice), askAmount)
 		}
 	}
 
@@ -261,7 +261,7 @@ func book(mkt string, lim int, useJson bool) {
 		if i == 0 {
 			fmt.Printf("%s\t%s\n", boldWhite(bidPrice), bidAmount)
 		} else {
-			fmt.Printf("%s\t%s\n", cyan(bidPrice), bidAmount)
+			fmt.Printf("%s\t%s\n", blue(bidPrice), bidAmount)
 		}
 	}
 
@@ -294,8 +294,8 @@ func cancelAll(useJson bool) {
 		return
 	}
 
-	fmt.Printf("%s: %+v\n", cyan("Cancelled Orders"), res.Details.CancelledOrders)
-	fmt.Printf("%s: %+v\n", cyan("Rejected Orders"), res.Details.CancelRejects)
+	fmt.Printf("%s: %+v\n", blue("Cancelled Orders"), res.Details.CancelledOrders)
+	fmt.Printf("%s: %+v\n", blue("Rejected Orders"), res.Details.CancelRejects)
 }
 
 func help() {
@@ -437,26 +437,26 @@ func market(mkt, side string, amount float64, bps int, useJson bool) {
 
 func printOrder(order gemini.Order) {
 	// log.Printf("Trade Created: %+v", order)
-	fmt.Printf("%s:\t\t%s\n", cyan("OrderId"), boldWhite(order.OrderId))
-	fmt.Printf("%s:\t\t\t%s\n", cyan("Symbol"), order.Symbol)
-	fmt.Printf("%s:\t\t\t%s\n", cyan("Side"), order.Side)
-	fmt.Printf("%s:\t\t\t%.8f\n", cyan("Price"), order.Price)
-	fmt.Printf("%s:\t\t%.8f\n", cyan("OriginalAmount"), order.OriginalAmount)
-	fmt.Printf("%s:\t\t%.8f\n", cyan("ExecutedAmount"), order.ExecutedAmount)
-	fmt.Printf("%s:\t%.8f\n", cyan("RemainingAmount"), order.RemainingAmount)
-	fmt.Printf("%s:\t%.8f\n", cyan("AvgExecutionPrice"), order.AvgExecutionPrice)
-	fmt.Printf("%s:\t\t\t%v\n", cyan("IsLive"), order.IsLive)
-	fmt.Printf("%s:\t\t%v\n", cyan("IsCancelled"), order.IsCancelled)
+	fmt.Printf("%s:\t\t%s\n", blue("OrderId"), boldWhite(order.OrderId))
+	fmt.Printf("%s:\t\t\t%s\n", blue("Symbol"), order.Symbol)
+	fmt.Printf("%s:\t\t\t%s\n", blue("Side"), order.Side)
+	fmt.Printf("%s:\t\t\t%.8f\n", blue("Price"), order.Price)
+	fmt.Printf("%s:\t\t%.8f\n", blue("OriginalAmount"), order.OriginalAmount)
+	fmt.Printf("%s:\t\t%.8f\n", blue("ExecutedAmount"), order.ExecutedAmount)
+	fmt.Printf("%s:\t%.8f\n", blue("RemainingAmount"), order.RemainingAmount)
+	fmt.Printf("%s:\t%.8f\n", blue("AvgExecutionPrice"), order.AvgExecutionPrice)
+	fmt.Printf("%s:\t\t\t%v\n", blue("IsLive"), order.IsLive)
+	fmt.Printf("%s:\t\t%v\n", blue("IsCancelled"), order.IsCancelled)
 }
 
 func printTrade(trade gemini.Trade) {
-	fmt.Printf("%s:\t%s\n", cyan("OrderId"), boldWhite(trade.OrderId))
-	fmt.Printf("%s:\t%v\n", cyan("Timestamp"), trade.Timestamp)
-	fmt.Printf("%s:\t\t%s\n", cyan("Type"), trade.Type)
-	fmt.Printf("%s:\t\t%.8f\n", cyan("Price"), trade.Price)
-	fmt.Printf("%s:\t\t%.8f\n", cyan("Amount"), trade.Amount)
-	fmt.Printf("%s:\t%.8f\n", cyan("FeeAmount"), trade.FeeAmount)
-	fmt.Printf("%s:\t\t%v\n", cyan("Maker"), !trade.Aggressor)
+	fmt.Printf("%s:\t%s\n", blue("OrderId"), boldWhite(trade.OrderId))
+	fmt.Printf("%s:\t%v\n", blue("Timestamp"), trade.Timestamp)
+	fmt.Printf("%s:\t\t%s\n", blue("Type"), trade.Type)
+	fmt.Printf("%s:\t\t%.8f\n", blue("Price"), trade.Price)
+	fmt.Printf("%s:\t\t%.8f\n", blue("Amount"), trade.Amount)
+	fmt.Printf("%s:\t%.8f\n", blue("FeeAmount"), trade.FeeAmount)
+	fmt.Printf("%s:\t\t%v\n", blue("Maker"), !trade.Aggressor)
 }
 
 func status(txid string, useJson bool) {
@@ -486,10 +486,10 @@ func ticker(mkt string, useJson bool) {
 		return
 	}
 
-	fmt.Printf("%s:\t%s\n", cyan("Bid"), boldWhite(t.Bid))
-	fmt.Printf("%s:\t%s\n", cyan("Ask"), boldWhite(t.Ask))
-	fmt.Printf("%s:\t%.8f\n", cyan("Last"), t.Last)
-	fmt.Printf("%s:\t%v\n", cyan("Volume"), t.Volume.BTC)
+	fmt.Printf("%s:\t%s\n", blue("Bid"), boldWhite(t.Bid))
+	fmt.Printf("%s:\t%s\n", blue("Ask"), boldWhite(t.Ask))
+	fmt.Printf("%s:\t%.8f\n", blue("Last"), t.Last)
+	fmt.Printf("%s:\t%v\n", blue("Volume"), t.Volume.BTC)
 }
 
 func trades(mkt string, lim int, timestamp int64, useJson bool) {
