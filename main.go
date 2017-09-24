@@ -53,7 +53,7 @@ Commands:
     	Get order book
   cancel
     	Cancel active order by txid
-  cancelAll
+  cancel-all
     	Cancel all active orders
   help
     	Show help dialog
