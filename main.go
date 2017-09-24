@@ -35,7 +35,7 @@ var (
 	g *gemini.Api
 )
 
-var ERROR_API_KEY_MISSING = `Please pass API keys as GEMINI_API_SANDBOX_KEY and
+var ERROR_API_KEY_MISSING = `Missing API keys. Pass GEMINI_API_SANDBOX_KEY and
 GEMINI_API_SANDBOX_SECRET as environment variables, or GEMINI_API_KEY and
 GEMINI_API_SECRET if in live mode`
 
