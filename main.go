@@ -117,8 +117,6 @@ func main() {
 		cancel(*txid, *useJson)
 	case "cancel-all":
 		cancelAll(*useJson)
-	case "help":
-		help()
 	case "limit":
 		limit(*mkt, *side, *amount, *bps, *price, *useJson)
 	case "market":
