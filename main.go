@@ -236,20 +236,13 @@ func book(mkt string, lim int, useJson bool) {
 		exitWithError(err)
 	}
 
-	if len(book.Asks) < lim {
-		lim = len(book.Asks)
-	}
-	if len(book.Bids) < lim {
-		lim = len(book.Bids)
-	}
-
 	if useJson {
 		chars, _ := json.Marshal(book)
 		fmt.Println(string(chars))
 		return
 	}
 
-	for i := lim - 1; i >= 0; i-- {
+	for i := len(book.Asks) - 1; i >= 0; i-- {
 		ask := book.Asks[i]
 
 		askAmount := fmt.Sprintf("%.8f", ask.Amount)
@@ -264,7 +257,7 @@ func book(mkt string, lim int, useJson bool) {
 
 	fmt.Println("")
 
-	for i := 0; i < lim; i++ {
+	for i, l := 0, len(book.Bids); i < l; i++ {
 		bid := book.Bids[i]
 
 		bidAmount := fmt.Sprintf("%.8f", bid.Amount)
