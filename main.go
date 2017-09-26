@@ -15,9 +15,9 @@ import (
 const (
 	RETRIES_MAX = 50
 
-	ERROR_API_KEY_MISSING = `Missing API keys. Pass GEMINI_API_SANDBOX_KEY and
-GEMINI_API_SANDBOX_SECRET as environment variables, or GEMINI_API_KEY and
-GEMINI_API_SECRET if in live mode`
+	ERROR_API_KEY_MISSING = "Missing API keys. Set GEMINI_API_SANDBOX_KEY " +
+		"and GEMINI_API_SANDBOX_SECRET in the environment, or " +
+		"GEMINI_API_KEY and GEMINI_API_SECRET for live mode"
 
 	ERROR_AMBIGUOUS_AMOUNT = "Ambiguous use of both amt and base-amt flags"
 	ERROR_INVALID_AMOUNT   = "Amount or Child Amount must be above 0"
