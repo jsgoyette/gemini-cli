@@ -14,32 +14,19 @@ import (
 
 const (
 	RETRIES_MAX = 50
-)
 
-var (
-	gemini_api_key    string
-	gemini_api_secret string
-
-	amount    *float64
-	bps       *int
-	date      *string
-	lim       *int
-	live      *bool
-	mkt       *string
-	price     *float64
-	side      *string
-	timestamp *int64
-	txid      *string
-	useJson   *bool
-
-	g *gemini.Api
-)
-
-var ERROR_API_KEY_MISSING = `Missing API keys. Pass GEMINI_API_SANDBOX_KEY and
+	ERROR_API_KEY_MISSING = `Missing API keys. Pass GEMINI_API_SANDBOX_KEY and
 GEMINI_API_SANDBOX_SECRET as environment variables, or GEMINI_API_KEY and
 GEMINI_API_SECRET if in live mode`
 
-var helpMsg = `
+	ERROR_AMBIGUOUS_AMOUNT = "Ambiguous use of both amt and base-amt flags"
+	ERROR_INVALID_AMOUNT   = "Amount or Child Amount must be above 0"
+	ERROR_INVALID_PRICE    = "Price must be above 0"
+	ERROR_MAX_RETRIES      = "Max retries"
+	ERROR_NO_ASKS          = "No asks in book"
+	ERROR_NO_BIDS          = "No bids in book"
+
+	HELP_MSG = `
 Usage:
 
   gemini-cli [command] [flags...]
@@ -70,6 +57,28 @@ Commands:
 
 Flags:
 `
+)
+
+var (
+	gemini_api_key    string
+	gemini_api_secret string
+
+	amount     *float64
+	bps        *int
+	baseAmount *float64
+	date       *string
+	lim        *int
+	live       *bool
+	mkt        *string
+	price      *float64
+	side       *string
+	timestamp  *int64
+	txid       *string
+	useJson    *bool
+
+	g *gemini.Api
+)
+
 var red = color.New(color.FgRed).SprintFunc()
 var blue = color.New(color.FgHiBlue).SprintFunc()
 var boldWhite = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
@@ -77,8 +86,9 @@ var boldWhite = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
 var flagset = flag.NewFlagSet("", flag.ExitOnError)
 
 func init() {
-	amount = flagset.Float64("amt", 0, "Amount of parent denomination")
+	amount = flagset.Float64("amt", 0, "Amount of quote currency")
 	bps = flagset.Int("bps", 25, "Fee Basis points")
+	baseAmount = flagset.Float64("base-amt", 0, "Amount of base currency")
 	date = flagset.String("date", "", "Date (in format of YYYY-MM-DD) for date query")
 	lim = flagset.Int("limit", 20, "Limit for list query")
 	live = flagset.Bool("live", false, "Live mode: true, false (default false)")
@@ -106,6 +116,10 @@ func main() {
 
 	g = gemini.New(*live, gemini_api_key, gemini_api_secret)
 
+	if *baseAmount > 0 && *amount > 0 {
+		exitWithError(errors.New(ERROR_AMBIGUOUS_AMOUNT))
+	}
+
 	switch cmd := os.Args[1]; cmd {
 	case "active":
 		active(*useJson)
@@ -118,9 +132,9 @@ func main() {
 	case "cancel-all":
 		cancelAll(*useJson)
 	case "limit":
-		limit(*mkt, *side, *amount, *bps, *price, *useJson)
+		limit(*mkt, *side, *amount, *baseAmount, *bps, *price, *useJson)
 	case "market":
-		market(*mkt, *side, *amount, *bps, *useJson)
+		market(*mkt, *side, *amount, *baseAmount, *bps, *useJson)
 	case "status":
 		status(*txid, *useJson)
 	case "ticker":
@@ -297,18 +311,18 @@ func cancelAll(useJson bool) {
 }
 
 func help() {
-	fmt.Println(helpMsg)
+	fmt.Println(HELP_MSG)
 	flagset.PrintDefaults()
 }
 
-func limit(mkt, side string, amount float64, bps int, price float64, useJson bool) {
+func limit(mkt, side string, amount, baseAmount float64, bps int, price float64, useJson bool) {
 
-	if amount <= 0.0 {
-		exitWithError(errors.New("Amount must be above 0"))
+	if amount <= 0.0 && baseAmount <= 0.0 {
+		exitWithError(errors.New(ERROR_INVALID_AMOUNT))
 	}
 
 	if price <= 0.0 {
-		exitWithError(errors.New("Price must be above 0"))
+		exitWithError(errors.New(ERROR_INVALID_PRICE))
 	}
 
 	decimals := 8
@@ -316,13 +330,21 @@ func limit(mkt, side string, amount float64, bps int, price float64, useJson boo
 		decimals = 6
 	}
 
+	feeRatio := getFeeRatio(bps)
+
 	if side == "buy" {
-		amount -= amount * getFeeRatio(bps)
+		amount -= amount * feeRatio
 	} else {
-		amount += amount * getFeeRatio(bps)
+		amount += amount * feeRatio
 	}
 
-	btcAmount := round(amount/price, decimals)
+	var btcAmount float64
+
+	if amount > 0 {
+		btcAmount = round(amount/price, decimals)
+	} else {
+		btcAmount = round(baseAmount, decimals)
+	}
 
 	// commit trade
 	order, err := g.NewOrder(mkt, "", btcAmount, price, side, []string{"maker-or-cancel"})
@@ -348,14 +370,14 @@ func getOrderBookEntry(mkt, side string) gemini.BookEntry {
 
 	if side == "buy" {
 		if len(book.Asks) < 1 {
-			exitWithError(errors.New("No asks in book"))
+			exitWithError(errors.New(ERROR_NO_ASKS))
 		}
 
 		return book.Asks[0]
 	}
 
 	if len(book.Bids) < 1 {
-		exitWithError(errors.New("No bids in book"))
+		exitWithError(errors.New(ERROR_NO_BIDS))
 	}
 
 	return book.Bids[0]
@@ -365,7 +387,12 @@ func getFeeRatio(bps int) float64 {
 	return float64(bps) / 10000
 }
 
-func market(mkt, side string, amount float64, bps int, useJson bool) {
+func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool) {
+
+	if amount <= 0.0 && baseAmount <= 0.0 {
+		exitWithError(errors.New(ERROR_INVALID_AMOUNT))
+	}
+
 	retries := 0
 	executedAmt := 0.0
 	orders := make([]gemini.Order, 0, 10)
@@ -375,31 +402,39 @@ func market(mkt, side string, amount float64, bps int, useJson bool) {
 		decimals = 6
 	}
 
-	if amount <= 0.0 {
-		exitWithError(errors.New("Amount must be above 0"))
-	}
+	feeRatio := getFeeRatio(bps)
 
 	if side == "buy" {
-		amount -= amount * getFeeRatio(bps)
+		amount -= amount * feeRatio
 	} else {
-		amount += amount * getFeeRatio(bps)
+		amount += amount * feeRatio
 	}
 
 	for {
 
 		if retries == RETRIES_MAX {
-			exitWithError(errors.New("Max retries"))
+			exitWithError(errors.New(ERROR_MAX_RETRIES))
 		}
 
-		// calculate purchase amount (USD)
-		fillAmount := amount
+		var fillAmount float64
+		if amount > 0 {
+			fillAmount = amount
+		} else {
+			fillAmount = baseAmount
+		}
 
 		if executedAmt > 0 {
 			fillAmount = fillAmount - executedAmt
 		}
 
 		bookEntry := getOrderBookEntry(mkt, side)
-		btcAmount := round(fillAmount/bookEntry.Price, decimals)
+
+		var btcAmount float64
+		if amount > 0 {
+			btcAmount = round(fillAmount/bookEntry.Price, decimals)
+		} else {
+			btcAmount = round(fillAmount, decimals)
+		}
 
 		if bookEntry.Amount < btcAmount {
 			btcAmount = round(bookEntry.Amount, decimals)
@@ -418,9 +453,13 @@ func market(mkt, side string, amount float64, bps int, useJson bool) {
 		}
 
 		// fmt.Printf("%+v\n", order)
-		executedAmt += order.ExecutedAmount * order.AvgExecutionPrice
+		if amount > 0 {
+			executedAmt += order.ExecutedAmount * order.AvgExecutionPrice
+		} else {
+			executedAmt += order.ExecutedAmount
+		}
 
-		if executedAmt >= amount-0.01 {
+		if (amount > 0 && executedAmt >= amount) || (baseAmount > 0 && executedAmt >= baseAmount) {
 			if useJson {
 				chars, _ := json.Marshal(orders)
 				fmt.Println(string(chars))
