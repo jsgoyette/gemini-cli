@@ -417,6 +417,14 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 		decimals = 6
 	}
 
+	minAmt := 0.000001
+	if (mkt == "btcusd" || mkt == "ethusd") && amount > 0 {
+		minAmt = 0.01
+	}
+	if (mkt == "ethbtc" || mkt == "ethusd") && baseAmount > 0 {
+		minAmt = 0.0001
+	}
+
 	feeRatio := getFeeRatio(bps)
 
 	if side == "buy" {
@@ -473,7 +481,7 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 			executedAmt += order.ExecutedAmount
 		}
 
-		if (amount > 0 && executedAmt >= amount) || (baseAmount > 0 && executedAmt >= baseAmount) {
+		if (amount > 0 && executedAmt >= amount-minAmt) || (baseAmount > 0 && executedAmt >= baseAmount-minAmt) {
 			if useJson {
 				chars, _ := json.Marshal(orders)
 				fmt.Println(string(chars))
