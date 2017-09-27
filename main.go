@@ -20,7 +20,7 @@ const (
 		"GEMINI_API_KEY and GEMINI_API_SECRET for live mode"
 
 	ERROR_AMBIGUOUS_AMOUNT = "Ambiguous use of both amt and base-amt flags"
-	ERROR_INVALID_AMOUNT   = "Amount or Child Amount must be above 0"
+	ERROR_INVALID_AMOUNT   = "Amount or Base Amount must be above 0"
 	ERROR_INVALID_PRICE    = "Price must be above 0"
 	ERROR_MAX_RETRIES      = "Max retries"
 	ERROR_NO_ASKS          = "No asks in book"
