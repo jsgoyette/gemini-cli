@@ -158,6 +158,32 @@ func exitWithError(err error) {
 	os.Exit(1)
 }
 
+func getFeeRatio(bps int) float64 {
+	return float64(bps) / 10000
+}
+
+func getOrderBookEntry(mkt, side string) gemini.BookEntry {
+	// grab order book to get current prices
+	book, err := g.OrderBook(mkt, 1, 1)
+	if err != nil {
+		exitWithError(err)
+	}
+
+	if side == "buy" {
+		if len(book.Asks) < 1 {
+			exitWithError(errors.New(ERROR_NO_ASKS))
+		}
+
+		return book.Asks[0]
+	}
+
+	if len(book.Bids) < 1 {
+		exitWithError(errors.New(ERROR_NO_BIDS))
+	}
+
+	return book.Bids[0]
+}
+
 func getTimeFromDate(date string) (int64, error) {
 	t, err := time.Parse("2006-01-02", date)
 	if err != nil {
@@ -165,6 +191,29 @@ func getTimeFromDate(date string) (int64, error) {
 	}
 
 	return t.UnixNano() / int64(time.Millisecond), nil
+}
+
+func printOrder(order gemini.Order) {
+	fmt.Printf("%s:\t\t%s\n", blue("OrderId"), boldWhite(order.OrderId))
+	fmt.Printf("%s:\t\t\t%s\n", blue("Symbol"), order.Symbol)
+	fmt.Printf("%s:\t\t\t%s\n", blue("Side"), order.Side)
+	fmt.Printf("%s:\t\t\t%.8f\n", blue("Price"), order.Price)
+	fmt.Printf("%s:\t\t%.8f\n", blue("OriginalAmount"), order.OriginalAmount)
+	fmt.Printf("%s:\t\t%.8f\n", blue("ExecutedAmount"), order.ExecutedAmount)
+	fmt.Printf("%s:\t%.8f\n", blue("RemainingAmount"), order.RemainingAmount)
+	fmt.Printf("%s:\t%.8f\n", blue("AvgExecutionPrice"), order.AvgExecutionPrice)
+	fmt.Printf("%s:\t\t\t%v\n", blue("IsLive"), order.IsLive)
+	fmt.Printf("%s:\t\t%v\n", blue("IsCancelled"), order.IsCancelled)
+}
+
+func printTrade(trade gemini.Trade) {
+	fmt.Printf("%s:\t%s\n", blue("OrderId"), boldWhite(trade.OrderId))
+	fmt.Printf("%s:\t%v\n", blue("Timestamp"), trade.Timestamp)
+	fmt.Printf("%s:\t\t%s\n", blue("Type"), trade.Type)
+	fmt.Printf("%s:\t\t%.8f\n", blue("Price"), trade.Price)
+	fmt.Printf("%s:\t\t%.8f\n", blue("Amount"), trade.Amount)
+	fmt.Printf("%s:\t%.8f\n", blue("FeeAmount"), trade.FeeAmount)
+	fmt.Printf("%s:\t\t%v\n", blue("Maker"), !trade.Aggressor)
 }
 
 func round(v float64, decimals int) float64 {
@@ -354,32 +403,6 @@ func limit(mkt, side string, amount, baseAmount float64, bps int, price float64,
 	printOrder(order)
 }
 
-func getOrderBookEntry(mkt, side string) gemini.BookEntry {
-	// grab order book to get current prices
-	book, err := g.OrderBook(mkt, 1, 1)
-	if err != nil {
-		exitWithError(err)
-	}
-
-	if side == "buy" {
-		if len(book.Asks) < 1 {
-			exitWithError(errors.New(ERROR_NO_ASKS))
-		}
-
-		return book.Asks[0]
-	}
-
-	if len(book.Bids) < 1 {
-		exitWithError(errors.New(ERROR_NO_BIDS))
-	}
-
-	return book.Bids[0]
-}
-
-func getFeeRatio(bps int) float64 {
-	return float64(bps) / 10000
-}
-
 func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool) {
 
 	if amount <= 0.0 && baseAmount <= 0.0 {
@@ -409,7 +432,10 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 			exitWithError(errors.New(ERROR_MAX_RETRIES))
 		}
 
-		var fillAmount float64
+		var fillAmount, btcAmount float64
+
+		bookEntry := getOrderBookEntry(mkt, side)
+
 		if amount > 0 {
 			fillAmount = amount
 		} else {
@@ -420,9 +446,6 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 			fillAmount = fillAmount - executedAmt
 		}
 
-		bookEntry := getOrderBookEntry(mkt, side)
-
-		var btcAmount float64
 		if amount > 0 {
 			btcAmount = round(fillAmount/bookEntry.Price, decimals)
 		} else {
@@ -463,30 +486,6 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 		fmt.Println("")
 		retries++
 	}
-}
-
-func printOrder(order gemini.Order) {
-	// log.Printf("Trade Created: %+v", order)
-	fmt.Printf("%s:\t\t%s\n", blue("OrderId"), boldWhite(order.OrderId))
-	fmt.Printf("%s:\t\t\t%s\n", blue("Symbol"), order.Symbol)
-	fmt.Printf("%s:\t\t\t%s\n", blue("Side"), order.Side)
-	fmt.Printf("%s:\t\t\t%.8f\n", blue("Price"), order.Price)
-	fmt.Printf("%s:\t\t%.8f\n", blue("OriginalAmount"), order.OriginalAmount)
-	fmt.Printf("%s:\t\t%.8f\n", blue("ExecutedAmount"), order.ExecutedAmount)
-	fmt.Printf("%s:\t%.8f\n", blue("RemainingAmount"), order.RemainingAmount)
-	fmt.Printf("%s:\t%.8f\n", blue("AvgExecutionPrice"), order.AvgExecutionPrice)
-	fmt.Printf("%s:\t\t\t%v\n", blue("IsLive"), order.IsLive)
-	fmt.Printf("%s:\t\t%v\n", blue("IsCancelled"), order.IsCancelled)
-}
-
-func printTrade(trade gemini.Trade) {
-	fmt.Printf("%s:\t%s\n", blue("OrderId"), boldWhite(trade.OrderId))
-	fmt.Printf("%s:\t%v\n", blue("Timestamp"), trade.Timestamp)
-	fmt.Printf("%s:\t\t%s\n", blue("Type"), trade.Type)
-	fmt.Printf("%s:\t\t%.8f\n", blue("Price"), trade.Price)
-	fmt.Printf("%s:\t\t%.8f\n", blue("Amount"), trade.Amount)
-	fmt.Printf("%s:\t%.8f\n", blue("FeeAmount"), trade.FeeAmount)
-	fmt.Printf("%s:\t\t%v\n", blue("Maker"), !trade.Aggressor)
 }
 
 func status(txid string, useJson bool) {
