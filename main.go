@@ -114,11 +114,11 @@ func main() {
 		exitWithError(err)
 	}
 
-	g = gemini.New(*live, gemini_api_key, gemini_api_secret)
-
 	if *baseAmount > 0 && *amount > 0 {
 		exitWithError(errors.New(ERROR_AMBIGUOUS_AMOUNT))
 	}
+
+	g = gemini.New(*live, gemini_api_key, gemini_api_secret)
 
 	switch cmd := os.Args[1]; cmd {
 	case "active":
@@ -163,7 +163,6 @@ func getFeeRatio(bps int) float64 {
 }
 
 func getOrderBookEntry(mkt, side string) gemini.BookEntry {
-	// grab order book to get current prices
 	book, err := g.OrderBook(mkt, 1, 1)
 	if err != nil {
 		exitWithError(err)
@@ -367,6 +366,8 @@ func limit(mkt, side string, amount, baseAmount float64, bps int, price float64,
 		exitWithError(errors.New(ERROR_INVALID_PRICE))
 	}
 
+	var btcAmount float64
+
 	decimals := 8
 	if mkt != "btcusd" {
 		decimals = 6
@@ -379,8 +380,6 @@ func limit(mkt, side string, amount, baseAmount float64, bps int, price float64,
 	} else {
 		amount += amount * feeRatio
 	}
-
-	var btcAmount float64
 
 	if amount > 0 {
 		btcAmount = round(amount/price, decimals)
@@ -468,7 +467,6 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 			printOrder(order)
 		}
 
-		// fmt.Printf("%+v\n", order)
 		if amount > 0 {
 			executedAmt += order.ExecutedAmount * order.AvgExecutionPrice
 		} else {
