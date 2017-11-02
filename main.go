@@ -243,7 +243,7 @@ func verifyApiKeys(live bool) error {
 func active(useJson bool) {
 	activeOrders, err := g.ActiveOrders()
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		exitWithError(err)
 	}
 
 	if useJson {
