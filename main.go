@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/jsgoyette/gemini"
+	"github.com/urfave/cli"
 )
 
 const (
@@ -25,162 +26,261 @@ const (
 	ERROR_MAX_RETRIES      = "Max retries"
 	ERROR_NO_ASKS          = "No asks in book"
 	ERROR_NO_BIDS          = "No bids in book"
-
-	HELP_MSG = `
-Usage:
-
-  gemini-cli [command] [flags...]
-
-Commands:
-  active
-    	List active orders
-  balances
-    	Get fund balances
-  book
-    	Get order book
-  cancel
-    	Cancel active order by txid
-  cancel-all
-    	Cancel all active orders
-  help
-    	Show help dialog
-  limit
-    	Create a limit order
-  market
-    	Create a market order
-  status
-    	Get status of active order
-  ticker
-    	Get ticker
-  trades
-    	List past trades
-
-Flags:
-`
 )
 
 var (
 	gemini_api_key    string
 	gemini_api_secret string
 
-	amount     *float64
-	bps        *int
-	baseAmount *float64
-	date       *string
-	lim        *int
-	live       *bool
-	mkt        *string
-	price      *float64
-	side       *string
-	timestamp  *int64
-	txid       *string
-	useJson    *bool
-
 	g *gemini.Api
+
+	amtFlag = cli.Float64Flag{
+		Name:  "amt",
+		Value: 0,
+		Usage: "Amount of quote currency",
+	}
+	bpsFlag = cli.IntFlag{
+		Name:  "bps",
+		Value: 25,
+		Usage: "Fee Basis points",
+	}
+	baseAmtFlag = cli.Float64Flag{
+		Name:  "base-amt",
+		Value: 0,
+		Usage: "Amount of base currency",
+	}
+	dateFlag = cli.StringFlag{
+		Name:  "date",
+		Value: "",
+		Usage: "Date (in format of YYYY-MM-DD) for date query",
+	}
+	jsonFlag = cli.BoolFlag{
+		Name:  "json",
+		Usage: "Return in JSON format: true, false (default false)",
+	}
+	limitFlag = cli.IntFlag{
+		Name:  "lim",
+		Value: 20,
+		Usage: "Limit for list query",
+	}
+	liveFlag = cli.BoolFlag{
+		Name:  "live",
+		Usage: "Live mode: true, false (default false)",
+	}
+	mktFlag = cli.StringFlag{
+		Name:  "mkt",
+		Value: "btcusd",
+		Usage: "Market: btcusd, ethusd, ethbtc",
+	}
+	priceFlag = cli.Float64Flag{
+		Name:  "price",
+		Value: 0,
+		Usage: "Price of parent denomination",
+	}
+	sideFlag = cli.StringFlag{
+		Name:  "side",
+		Value: "buy",
+		Usage: "Side: buy, sell",
+	}
+	timeFlag = cli.Int64Flag{
+		Name:  "time",
+		Value: 0,
+		Usage: "Timestamp (with milliseconds) for date query",
+	}
+	txidFlag = cli.StringFlag{
+		Name:  "txid",
+		Value: "",
+		Usage: "Id of order",
+	}
+
+	commands = []cli.Command{
+		{
+			Name:    "active",
+			Aliases: []string{"a"},
+			Usage:   "List active orders",
+			Action:  active,
+			Flags:   []cli.Flag{jsonFlag},
+		},
+		{
+			Name:    "balances",
+			Aliases: []string{"b"},
+			Usage:   "Get fund balances",
+			Action:  balances,
+			Flags:   []cli.Flag{jsonFlag},
+		},
+		{
+			Name:    "book",
+			Aliases: []string{"bk"},
+			Usage:   "Get order book",
+			Action:  book,
+			Flags:   []cli.Flag{mktFlag, limitFlag, jsonFlag},
+		},
+		{
+			Name:    "cancel",
+			Aliases: []string{"c"},
+			Usage:   "Cancel active order by txid",
+			Action:  cancel,
+			Flags:   []cli.Flag{txidFlag, jsonFlag},
+		},
+		{
+			Name:    "cancel-all",
+			Aliases: []string{"ca"},
+			Usage:   "Cancel all active orders",
+			Action:  cancelAll,
+			Flags:   []cli.Flag{jsonFlag},
+		},
+		{
+			Name:    "limit",
+			Aliases: []string{"l"},
+			Usage:   "Create a limit order",
+			Action:  limit,
+			Flags: []cli.Flag{
+				amtFlag,
+				baseAmtFlag,
+				bpsFlag,
+				jsonFlag,
+				mktFlag,
+				priceFlag,
+				sideFlag,
+			},
+			Before: beforeTransaction,
+		},
+		{
+			Name:    "market",
+			Aliases: []string{"m"},
+			Usage:   "Create a market order",
+			Action:  market,
+			Flags: []cli.Flag{
+				amtFlag,
+				baseAmtFlag,
+				bpsFlag,
+				jsonFlag,
+				mktFlag,
+				sideFlag,
+			},
+			Before: beforeTransaction,
+		},
+		{
+			Name:    "status",
+			Aliases: []string{"s"},
+			Usage:   "Get status of active order",
+			Action:  status,
+			Flags:   []cli.Flag{txidFlag, jsonFlag},
+		},
+		{
+			Name:    "ticker",
+			Aliases: []string{"tr"},
+			Usage:   "Get ticker",
+			Action:  ticker,
+			Flags:   []cli.Flag{mktFlag, jsonFlag},
+		},
+		{
+			Name:    "trades",
+			Aliases: []string{"t"},
+			Usage:   "List past trades",
+			Action:  trades,
+			Flags: []cli.Flag{
+				dateFlag,
+				jsonFlag,
+				limitFlag,
+				mktFlag,
+				timeFlag,
+			},
+			Before: beforeTrade,
+		},
+	}
+
+	red       = color.New(color.FgRed).SprintFunc()
+	blue      = color.New(color.FgHiBlue).SprintFunc()
+	boldWhite = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
 )
 
-var red = color.New(color.FgRed).SprintFunc()
-var blue = color.New(color.FgHiBlue).SprintFunc()
-var boldWhite = color.New(color.FgWhite).Add(color.Bold).SprintFunc()
-
-var flagset = flag.NewFlagSet("", flag.ExitOnError)
-
-func init() {
-	amount = flagset.Float64("amt", 0, "Amount of quote currency")
-	bps = flagset.Int("bps", 25, "Fee Basis points")
-	baseAmount = flagset.Float64("base-amt", 0, "Amount of base currency")
-	date = flagset.String("date", "", "Date (in format of YYYY-MM-DD) for date query")
-	lim = flagset.Int("limit", 20, "Limit for list query")
-	live = flagset.Bool("live", false, "Live mode: true, false (default false)")
-	mkt = flagset.String("mkt", "btcusd", "Market: btcusd, ethusd, ethbtc")
-	price = flagset.Float64("price", 0, "Price of parent denomination")
-	side = flagset.String("side", "buy", "Side: buy, sell")
-	timestamp = flagset.Int64("time", 0, "Timestamp (with milliseconds) for date query")
-	txid = flagset.String("txid", "", "Id of order")
-	useJson = flagset.Bool("json", false, "Return in JSON format: true, false (default false)")
-}
-
 func main() {
+	app := cli.NewApp()
 
-	if len(os.Args) < 2 {
-		help()
-		return
-	}
+	app.Usage = "Gemini API utility"
+	app.UsageText = "gemini-cli [global options] command [command options]"
+	app.Version = "0.0.1"
 
-	flagset.Parse(os.Args[2:])
+	app.Flags = []cli.Flag{liveFlag}
+	app.Before = beforeApp
+	app.Commands = commands
 
-	err := verifyApiKeys(*live)
-	if err != nil {
-		exitWithError(err)
-	}
+	sort.Sort(cli.FlagsByName(app.Flags))
+	sort.Sort(cli.CommandsByName(app.Commands))
 
-	if *baseAmount > 0 && *amount > 0 {
-		exitWithError(errors.New(ERROR_AMBIGUOUS_AMOUNT))
-	}
-
-	g = gemini.New(*live, gemini_api_key, gemini_api_secret)
-
-	switch cmd := os.Args[1]; cmd {
-	case "active":
-		active(*useJson)
-	case "balances":
-		balances(*useJson)
-	case "book":
-		book(*mkt, *lim, *useJson)
-	case "cancel":
-		cancel(*txid, *useJson)
-	case "cancel-all":
-		cancelAll(*useJson)
-	case "limit":
-		limit(*mkt, *side, *amount, *baseAmount, *bps, *price, *useJson)
-	case "market":
-		market(*mkt, *side, *amount, *baseAmount, *bps, *useJson)
-	case "status":
-		status(*txid, *useJson)
-	case "ticker":
-		ticker(*mkt, *useJson)
-	case "trades":
-		if *date != "" {
-			*timestamp, err = getTimeFromDate(*date)
-			if err != nil {
-				exitWithError(err)
-			}
-		}
-		trades(*mkt, *lim, *timestamp, *useJson)
-	default:
-		help()
-	}
-
+	app.Run(os.Args)
 }
 
-func exitWithError(err error) {
+func printError(err error) {
 	fmt.Fprintf(os.Stderr, "%s: %v\n", red("Error"), err)
-	os.Exit(1)
+	fmt.Fprintf(os.Stderr, "")
+	return
+}
+
+func beforeApp(c *cli.Context) error {
+	live := c.Bool("live")
+
+	err := verifyApiKeys(live)
+	if err != nil {
+		printError(err)
+		return err
+	}
+
+	g = gemini.New(live, gemini_api_key, gemini_api_secret)
+
+	return nil
+}
+
+func beforeTrade(c *cli.Context) error {
+	date := c.String("date")
+
+	if date != "" {
+		t, err := getTimeFromDate(date)
+		if err != nil {
+			printError(err)
+			return err
+		}
+
+		c.Set("time", string(t))
+	}
+
+	return nil
+}
+
+func beforeTransaction(c *cli.Context) error {
+	if c.Float64("base-amt") > 0 && c.Float64("amt") > 0 {
+		err := errors.New(ERROR_AMBIGUOUS_AMOUNT)
+		printError(err)
+		return err
+	}
+	return nil
 }
 
 func getFeeRatio(bps int) float64 {
 	return float64(bps) / 10000
 }
 
-func getOrderBookEntry(mkt, side string) gemini.BookEntry {
+func getOrderBookEntry(mkt, side string) (*gemini.BookEntry, error) {
 	book, err := g.OrderBook(mkt, 1, 1)
+
 	if err != nil {
-		exitWithError(err)
+		return nil, err
 	}
 
 	if side == "buy" {
 		if len(book.Asks) < 1 {
-			exitWithError(errors.New(ERROR_NO_ASKS))
+			return nil, errors.New(ERROR_NO_ASKS)
 		}
 
-		return book.Asks[0]
+		return &book.Asks[0], nil
 	}
 
 	if len(book.Bids) < 1 {
-		exitWithError(errors.New(ERROR_NO_BIDS))
+		return nil, errors.New(ERROR_NO_BIDS)
 	}
 
-	return book.Bids[0]
+	return &book.Bids[0], nil
 }
 
 func getTimeFromDate(date string) (int64, error) {
@@ -240,16 +340,17 @@ func verifyApiKeys(live bool) error {
 	return nil
 }
 
-func active(useJson bool) {
+func active(c *cli.Context) error {
 	activeOrders, err := g.ActiveOrders()
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(activeOrders)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	for idx, order := range activeOrders {
@@ -258,36 +359,45 @@ func active(useJson bool) {
 			fmt.Println("")
 		}
 	}
+
+	return nil
 }
 
-func balances(useJson bool) {
+func balances(c *cli.Context) error {
 	balances, err := g.Balances()
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(balances)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	for _, fund := range balances {
 		fmt.Printf("%s: %v\n", blue(fund.Currency), fund.Amount)
 	}
+
+	return nil
 }
 
-func book(mkt string, lim int, useJson bool) {
+func book(c *cli.Context) error {
+
+	mkt := c.String("mkt")
+	lim := c.Int("lim")
 
 	book, err := g.OrderBook(mkt, lim, lim)
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(book)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	for i := len(book.Asks) - 1; i >= 0; i-- {
@@ -318,52 +428,64 @@ func book(mkt string, lim int, useJson bool) {
 		}
 	}
 
+	return nil
 }
 
-func cancel(txid string, useJson bool) {
-	order, err := g.CancelOrder(txid)
+func cancel(c *cli.Context) error {
+	order, err := g.CancelOrder(c.String("txid"))
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(order)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	printOrder(order)
+	return nil
 }
 
-func cancelAll(useJson bool) {
+func cancelAll(c *cli.Context) error {
 	res, err := g.CancelAll()
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(res)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	fmt.Printf("%s: %+v\n", blue("Cancelled Orders"), res.Details.CancelledOrders)
 	fmt.Printf("%s: %+v\n", blue("Rejected Orders"), res.Details.CancelRejects)
+
+	return nil
 }
 
-func help() {
-	fmt.Println(HELP_MSG)
-	flagset.PrintDefaults()
-}
+func limit(c *cli.Context) error {
 
-func limit(mkt, side string, amount, baseAmount float64, bps int, price float64, useJson bool) {
+	amount := c.Float64("amt")
+	baseAmount := c.Float64("base-amt")
+	bps := c.Int("bps")
+	mkt := c.String("mkt")
+	price := c.Float64("price")
+	side := c.String("side")
 
 	if amount <= 0.0 && baseAmount <= 0.0 {
-		exitWithError(errors.New(ERROR_INVALID_AMOUNT))
+		err := errors.New(ERROR_INVALID_AMOUNT)
+		printError(err)
+		return err
 	}
 
 	if price <= 0.0 {
-		exitWithError(errors.New(ERROR_INVALID_PRICE))
+		err := errors.New(ERROR_INVALID_PRICE)
+		printError(err)
+		return err
 	}
 
 	var btcAmount float64
@@ -390,22 +512,32 @@ func limit(mkt, side string, amount, baseAmount float64, bps int, price float64,
 	// commit trade
 	order, err := g.NewOrder(mkt, "", btcAmount, price, side, []string{"maker-or-cancel"})
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(order)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	printOrder(order)
+	return nil
 }
 
-func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool) {
+func market(c *cli.Context) error {
+
+	amount := c.Float64("amt")
+	baseAmount := c.Float64("base-amt")
+	bps := c.Int("bps")
+	mkt := c.String("mkt")
+	side := c.String("side")
 
 	if amount <= 0.0 && baseAmount <= 0.0 {
-		exitWithError(errors.New(ERROR_INVALID_AMOUNT))
+		err := errors.New(ERROR_INVALID_AMOUNT)
+		printError(err)
+		return err
 	}
 
 	retries := 0
@@ -436,12 +568,18 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 	for {
 
 		if retries == RETRIES_MAX {
-			exitWithError(errors.New(ERROR_MAX_RETRIES))
+			err := errors.New(ERROR_MAX_RETRIES)
+			printError(err)
+			return err
 		}
 
 		var fillAmount, btcAmount float64
 
-		bookEntry := getOrderBookEntry(mkt, side)
+		bookEntry, err := getOrderBookEntry(mkt, side)
+		if err != nil {
+			printError(err)
+			return err
+		}
 
 		if amount > 0 {
 			fillAmount = amount
@@ -466,10 +604,11 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 		// commit trade
 		order, err := g.NewOrder(mkt, "", btcAmount, bookEntry.Price, side, []string{"immediate-or-cancel"})
 		if err != nil {
-			exitWithError(err)
+			printError(err)
+			return err
 		}
 
-		if useJson {
+		if c.Bool("json") {
 			orders = append(orders, order)
 		} else {
 			printOrder(order)
@@ -482,11 +621,11 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 		}
 
 		if (amount > 0 && executedAmt >= amount-minAmt) || (baseAmount > 0 && executedAmt >= baseAmount-minAmt) {
-			if useJson {
+			if c.Bool("json") {
 				chars, _ := json.Marshal(orders)
 				fmt.Println(string(chars))
 			}
-			return
+			return nil
 		}
 
 		fmt.Println("")
@@ -494,49 +633,60 @@ func market(mkt, side string, amount, baseAmount float64, bps int, useJson bool)
 	}
 }
 
-func status(txid string, useJson bool) {
-	order, err := g.OrderStatus(txid)
+func status(c *cli.Context) error {
+	order, err := g.OrderStatus(c.String("txid"))
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(order)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	printOrder(order)
+
+	return nil
 }
 
-func ticker(mkt string, useJson bool) {
-	t, err := g.Ticker(mkt)
+func ticker(c *cli.Context) error {
+	t, err := g.Ticker(c.String("mkt"))
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(t)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	fmt.Printf("%s:\t%s\n", blue("Bid"), boldWhite(t.Bid))
 	fmt.Printf("%s:\t%s\n", blue("Ask"), boldWhite(t.Ask))
 	fmt.Printf("%s:\t%.8f\n", blue("Last"), t.Last)
 	fmt.Printf("%s:\t%v\n", blue("Volume"), t.Volume.BTC)
+
+	return nil
 }
 
-func trades(mkt string, lim int, timestamp int64, useJson bool) {
+func trades(c *cli.Context) error {
+	mkt := c.String("mkt")
+	lim := c.Int("lim")
+	timestamp := c.Int64("time")
+
 	pastTrades, err := g.PastTrades(mkt, lim, timestamp)
 	if err != nil {
-		exitWithError(err)
+		printError(err)
+		return err
 	}
 
-	if useJson {
+	if c.Bool("json") {
 		chars, _ := json.Marshal(pastTrades)
 		fmt.Println(string(chars))
-		return
+		return nil
 	}
 
 	for idx, trade := range pastTrades {
@@ -546,4 +696,5 @@ func trades(mkt string, lim int, timestamp int64, useJson bool) {
 		}
 	}
 
+	return nil
 }
