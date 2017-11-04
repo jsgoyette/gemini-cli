@@ -6,7 +6,7 @@ import (
 
 var (
 	amtFlag = cli.Float64Flag{
-		Name:  "amt",
+		Name:  "amt, a",
 		Value: 0,
 		Usage: "Amount of quote currency",
 	}
@@ -16,21 +16,21 @@ var (
 		Usage: "Fee Basis points",
 	}
 	baseAmtFlag = cli.Float64Flag{
-		Name:  "base-amt",
+		Name:  "base-amt, b",
 		Value: 0,
 		Usage: "Amount of base currency",
 	}
 	dateFlag = cli.StringFlag{
-		Name:  "date",
+		Name:  "date, d",
 		Value: "",
 		Usage: "Date (in format of YYYY-MM-DD) for date query",
 	}
 	jsonFlag = cli.BoolFlag{
-		Name:  "json",
+		Name:  "json, j",
 		Usage: "Return in JSON format: true, false (default false)",
 	}
 	limitFlag = cli.IntFlag{
-		Name:  "lim",
+		Name:  "lim, l",
 		Value: 20,
 		Usage: "Limit for list query",
 	}
@@ -39,27 +39,27 @@ var (
 		Usage: "Live mode: true, false (default false)",
 	}
 	mktFlag = cli.StringFlag{
-		Name:  "mkt",
+		Name:  "mkt, m",
 		Value: "btcusd",
 		Usage: "Market: btcusd, ethusd, ethbtc",
 	}
 	priceFlag = cli.Float64Flag{
-		Name:  "price",
+		Name:  "price, p",
 		Value: 0,
 		Usage: "Price of parent denomination",
 	}
 	sideFlag = cli.StringFlag{
-		Name:  "side",
+		Name:  "side, s",
 		Value: "buy",
 		Usage: "Side: buy, sell",
 	}
 	timeFlag = cli.Int64Flag{
-		Name:  "time",
+		Name:  "time, t",
 		Value: 0,
 		Usage: "Timestamp (with milliseconds) for date query",
 	}
 	txidFlag = cli.StringFlag{
-		Name:  "txid",
+		Name:  "txid, x",
 		Value: "",
 		Usage: "Id of order",
 	}
