@@ -16,12 +16,12 @@ var (
 		Usage: "Fee Basis points",
 	}
 	baseAmtFlag = cli.Float64Flag{
-		Name:  "base-amt, b",
+		Name:  "base-amt, A",
 		Value: 0,
 		Usage: "Amount of base currency",
 	}
 	dateFlag = cli.StringFlag{
-		Name:  "date, d",
+		Name:  "date, T",
 		Value: "",
 		Usage: "Date (in format of YYYY-MM-DD) for date query",
 	}
