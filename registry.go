@@ -63,6 +63,10 @@ var (
 		Value: "",
 		Usage: "Id of order",
 	}
+	unsafeFlag = cli.BoolFlag{
+		Name:  "unsafe",
+		Usage: "Continue filling after partial orders: true, false (default false)",
+	}
 
 	commands = []cli.Command{
 		{
@@ -135,6 +139,7 @@ var (
 				jsonFlag,
 				mktFlag,
 				sideFlag,
+				unsafeFlag,
 			},
 			Before: beforeTransaction,
 		},

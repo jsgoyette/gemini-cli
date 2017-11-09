@@ -277,6 +277,11 @@ func market(c *cli.Context) error {
 			return err
 		}
 
+		if c.Bool("unsafe") == false {
+			printOrder(order)
+			return nil
+		}
+
 		if c.Bool("json") {
 			orders = append(orders, order)
 		} else {
