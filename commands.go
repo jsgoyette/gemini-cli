@@ -266,10 +266,6 @@ func market(c *cli.Context) error {
 			btcAmount = round(fillAmount, decimals)
 		}
 
-		if bookEntry.Amount < btcAmount {
-			btcAmount = round(bookEntry.Amount, decimals)
-		}
-
 		// commit trade
 		order, err := g.NewOrder(mkt, "", btcAmount, bookEntry.Price, side, []string{"immediate-or-cancel"})
 		if err != nil {
