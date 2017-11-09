@@ -39,7 +39,7 @@ var (
 func main() {
 	app := cli.NewApp()
 
-	app.Usage = "Gemini API utility"
+	app.Usage = "CLI for the Gemini Bitcoin exchange API"
 	app.UsageText = "gemini-cli [global options] command [command options]"
 	app.Version = "0.0.1"
 
