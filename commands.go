@@ -346,6 +346,17 @@ func trades(c *cli.Context) error {
 	mkt := c.String("mkt")
 	lim := c.Int("lim")
 	timestamp := c.Int64("time")
+	date := c.String("date")
+
+	if date != "" {
+		t, err := getTimeFromDate(date)
+		if err != nil {
+			printError(err)
+			return err
+		}
+
+		timestamp = t
+	}
 
 	pastTrades, err := g.PastTrades(mkt, lim, timestamp)
 	if err != nil {

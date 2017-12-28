@@ -172,7 +172,6 @@ var (
 				mktFlag,
 				timeFlag,
 			},
-			Before: beforeTrade,
 		},
 	}
 )

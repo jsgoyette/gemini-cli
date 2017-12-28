@@ -67,22 +67,6 @@ func beforeApp(c *cli.Context) error {
 	return nil
 }
 
-func beforeTrade(c *cli.Context) error {
-	date := c.String("date")
-
-	if date != "" {
-		t, err := getTimeFromDate(date)
-		if err != nil {
-			printError(err)
-			return err
-		}
-
-		c.Set("time", string(t))
-	}
-
-	return nil
-}
-
 func beforeTransaction(c *cli.Context) error {
 	if c.Float64("base-amt") > 0 && c.Float64("amt") > 0 {
 		err := errors.New(ERROR_AMBIGUOUS_AMOUNT)
