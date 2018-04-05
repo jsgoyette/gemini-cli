@@ -12,7 +12,7 @@ var (
 	}
 	bpsFlag = cli.IntFlag{
 		Name:  "bps",
-		Value: 25,
+		Value: 100,
 		Usage: "Fee Basis points",
 	}
 	baseAmtFlag = cli.Float64Flag{
